@@ -4,6 +4,7 @@ from numpy.linalg import norm
 from numpy.linalg import svd
 from numpy.linalg import matrix_rank
 
+
 # hier8_neat.m
 def hier8_neat(X, k, **params):
     params.setdefault('trial_allowance', 3)
@@ -15,14 +16,14 @@ def hier8_neat(X, k, **params):
     params.setdefault('maxiter', 500)
 
     m, n = X.shape
-    clusters = [None] * (2 * (k - 1))
-    Ws = [None] * (2 * (k - 1))
-    W_buffer = [None] * (2 * (k - 1))
-    H_buffer = [None] * (2 * (k - 1))
-    priorities = np.zeros(2 * (k - 1), dtype=np.float32)
-    is_leaf = -np.ones(2 * (k - 1), dtype=np.float32)
-    tree = np.zeros((2, 2 * (k - 1)), dtype=np.float32)
-    splits = -np.ones(k - 1, dtype=np.float32)
+    clusters = [None] * (2 * k)
+    Ws = [None] * (2 * k)
+    W_buffer = [None] * (2 * k)
+    H_buffer = [None] * (2 * k)
+    priorities = np.zeros(2 * k, dtype=np.float32)
+    is_leaf = -np.ones(2 * k, dtype=np.float32)
+    tree = np.zeros((2, 2 * k), dtype=np.float32)
+    splits = -np.ones(k, dtype=np.float32)
 
     term_subset = np.where(np.sum(X, axis=1) != 0)[0]
     W = np.random.random((len(term_subset), 2))
@@ -36,7 +37,7 @@ def hier8_neat(X, k, **params):
         del W_tmp
 
     result_used = 0
-    for i in range(k - 1):
+    for i in range(k):
         if i == 0:
             split_node = 0
             new_nodes = [0, 1]
@@ -49,6 +50,9 @@ def hier8_neat(X, k, **params):
             split_node = np.argmax(temp_priority)
             if temp_priority[split_node] < 0:
                 print(f'Cannot generate all {k} leaf clusters')
+                
+                Ws = [W for W in Ws if W is not None]
+                Ws = np.array(Ws, dtype=np.float32)
                 return tree, splits, is_leaf, clusters, Ws, priorities
 
             split_node = leaves[split_node]
@@ -82,6 +86,7 @@ def hier8_neat(X, k, **params):
         H_buffer[new_nodes[1]] = H_buffer_one
         priorities[new_nodes[1]] = priority_one
 
+    Ws = np.array(Ws, dtype=np.float32)
     return tree, splits, is_leaf, clusters, Ws, priorities
 
 
@@ -203,7 +208,7 @@ def NDCG_part(ground, test, weight, weight_part):
 
 # nmfsh_comb_rank2.m
 def nmfsh_comb_rank2(A, Winit, Hinit, **params):
-    eps = 1e-7
+    eps = 1e-6
     m, n = A.shape
     W, H = Winit, Hinit
     
@@ -291,7 +296,7 @@ def nmfsh_comb_rank2(A, Winit, Hinit, **params):
 
 # anls_entry_rank2_precompute.m
 def anls_entry_rank2_precompute(left, right, H):
-    eps = 1e-7
+    eps = 1e-6
     n = right.shape[0]
 
     solve_either = np.zeros((n, 2), dtype=np.float32)
