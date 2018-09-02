@@ -16,13 +16,13 @@ def hier8_neat(X, k, **params):
     params.setdefault('maxiter', 500)
 
     m, n = X.shape
-    clusters = [None] * (2 * k)
-    Ws = [None] * (2 * k)
-    W_buffer = [None] * (2 * k)
-    H_buffer = [None] * (2 * k)
-    priorities = np.zeros(2 * k, dtype=np.float32)
-    is_leaf = -np.ones(2 * k, dtype=np.float32)
-    tree = np.zeros((2, 2 * k), dtype=np.float32)
+    clusters = [None] * (2 * (k - 1))
+    Ws = [None] * (2 * (k - 1))
+    W_buffer = [None] * (2 * (k - 1))
+    H_buffer = [None] * (2 * (k - 1))
+    priorities = np.zeros(2 * k - 1, dtype=np.float32)
+    is_leaf = -np.ones(2 * (k - 1), dtype=np.float32)
+    tree = np.zeros((2, 2 * (k - 1)), dtype=np.float32)
     splits = -np.ones(k, dtype=np.float32)
 
     term_subset = np.where(np.sum(X, axis=1) != 0)[0]
@@ -37,7 +37,7 @@ def hier8_neat(X, k, **params):
         del W_tmp
 
     result_used = 0
-    for i in range(k):
+    for i in range(k - 1):
         if i == 0:
             split_node = 0
             new_nodes = [0, 1]
@@ -52,7 +52,6 @@ def hier8_neat(X, k, **params):
                 print(f'Cannot generate all {k} leaf clusters')
                 
                 Ws = [W for W in Ws if W is not None]
-                Ws = np.array(Ws, dtype=np.float32)
                 return tree, splits, is_leaf, clusters, Ws, priorities
 
             split_node = leaves[split_node]
@@ -86,7 +85,6 @@ def hier8_neat(X, k, **params):
         H_buffer[new_nodes[1]] = H_buffer_one
         priorities[new_nodes[1]] = priority_one
 
-    Ws = np.array(Ws, dtype=np.float32)
     return tree, splits, is_leaf, clusters, Ws, priorities
 
 
