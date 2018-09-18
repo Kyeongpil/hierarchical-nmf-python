@@ -6,14 +6,15 @@ from numpy.linalg import matrix_rank
 
 
 # hier8_neat.m
-def hier8_neat(X, k, **params):
+def hier8_neat(X, k, random_state=0, **params):
+    random_state = np.random.RandomState(seed=random_state)
     params.setdefault('trial_allowance', 3)
     params.setdefault('unbalanced', 0.1)
     params.setdefault('vec_norm', 2.0)
     params.setdefault('normW', True)
     params.setdefault('anls_alg', anls_entry_rank2_precompute)
     params.setdefault('tol', 1e-4)
-    params.setdefault('maxiter', 500)
+    params.setdefault('maxiter', 200)
 
     m, n = X.shape
     clusters = [None] * (2 * (k - 1))
@@ -26,8 +27,8 @@ def hier8_neat(X, k, **params):
     splits = -np.ones(k - 1, dtype=np.float32)
 
     term_subset = np.where(np.sum(X, axis=1) != 0)[0]
-    W = np.random.random((len(term_subset), 2))
-    H = np.random.random((2, n))
+    W = random_state.rand(len(term_subset), 2)
+    H = random_state.rand(2, n)
     if len(term_subset) == m:
         W, H = nmfsh_comb_rank2(X, W, H, **params)
     else:
@@ -72,14 +73,14 @@ def hier8_neat(X, k, **params):
         is_leaf[new_nodes] = 1
 
         subset = clusters[new_nodes[0]]
-        subset, W_buffer_one, H_buffer_one, priority_one = trial_split(min_priority, X, subset, W[:, 0], **params)
+        subset, W_buffer_one, H_buffer_one, priority_one = trial_split(min_priority, X, subset, W[:, 0], random_state, **params)
         clusters[new_nodes[0]] = subset
         W_buffer[new_nodes[0]] = W_buffer_one
         H_buffer[new_nodes[0]] = H_buffer_one
         priorities[new_nodes[0]] = priority_one
 
         subset = clusters[new_nodes[1]]
-        subset, W_buffer_one, H_buffer_one, priority_one = trial_split(min_priority, X, subset, W[:, 1], **params)
+        subset, W_buffer_one, H_buffer_one, priority_one = trial_split(min_priority, X, subset, W[:, 1], random_state, **params)
         clusters[new_nodes[1]] = subset
         W_buffer[new_nodes[1]] = W_buffer_one
         H_buffer[new_nodes[1]] = H_buffer_one
@@ -88,13 +89,13 @@ def hier8_neat(X, k, **params):
     return tree, splits, is_leaf, clusters, Ws, priorities
 
 
-def trial_split(min_priority, X, subset, W_parent, **params):
+def trial_split(min_priority, X, subset, W_parent, random_state, **params):
     m = X.shape[0]
 
     trial = 0
     subset_backup = subset
     while trial < params['trial_allowance']:
-        cluster_subset, W_buffer_one, H_buffer_one, priority_one = actual_split(X, subset, W_parent, **params)
+        cluster_subset, W_buffer_one, H_buffer_one, priority_one = actual_split(X, subset, W_parent, random_state, **params)
         if priority_one < 0:
             break
 
@@ -108,7 +109,7 @@ def trial_split(min_priority, X, subset, W_parent, **params):
             idx_small = np.argmin(np.array([length_cluster1, length_cluster2]))
             subset_small = np.where(cluster_subset == unique_cluster_subset[idx_small])[0]
             subset_small = subset[subset_small]
-            _, _, _, priority_one_small = actual_split(X, subset_small, W_buffer_one[:, idx_small], **params)
+            _, _, _, priority_one_small = actual_split(X, subset_small, W_buffer_one[:, idx_small], random_state, **params)
             if priority_one_small < min_priority:
                 trial += 1
                 if trial < params['trial_allowance']:
@@ -129,7 +130,7 @@ def trial_split(min_priority, X, subset, W_parent, **params):
     return subset, W_buffer_one, H_buffer_one, priority_one
 
 
-def actual_split(X, subset, W_parent, **params):
+def actual_split(X, subset, W_parent, random_state, **params):
     m = X.shape[0]
     if len(subset) <= 3:
         cluster_subset = np.ones(len(subset), dtype=np.float32)
@@ -139,8 +140,8 @@ def actual_split(X, subset, W_parent, **params):
     else:
         term_subset = np.where(np.sum(X[:, subset], axis=1) != 0)[0]
         X_subset = X[term_subset, :][:, subset]
-        W = np.random.random((len(term_subset), 2))
-        H = np.random.random((2, len(subset)))
+        W = random_state.rand(len(term_subset), 2)
+        H = random_state.rand(2, len(subset))
         W, H = nmfsh_comb_rank2(X_subset, W, H, **params)
         cluster_subset = np.argmax(H, axis=0)
         W_buffer_one = np.zeros((m, 2), dtype=np.float32)
@@ -218,7 +219,7 @@ def nmfsh_comb_rank2(A, Winit, Hinit, **params):
     vec_norm = params.get('vec_norm', 2.0)
     normW = params.get('normW', True)
     tol = params.get('tol', 1e-4)
-    maxiter = params.get('maxiter', 500)
+    maxiter = params.get('maxiter', 200)
 
     left = H.dot(H.T)
     right = A.dot(H.T)
@@ -241,7 +242,7 @@ def nmfsh_comb_rank2(A, Winit, Hinit, **params):
         if np.min(norms_W) < eps:
             print('Error: Some column of W is essentially zero')
 
-        W /= norms_W
+        W *= 1.0 / norms_W
         left = W.T.dot(W)
         right = A.T.dot(W)
         if matrix_rank(left) < 2:
@@ -329,8 +330,8 @@ def anls_entry_rank2_precompute(left, right, H):
             e2 = right[:, 1] + ct * right[:, 0]
             f2 = -right[:, 0] + ct * right[:, 1]
 
-        H[:, 1] = f2 / d2
-        H[:, 0] = (e2 - b2 * H[:, 1]) / a2
+        H[:, 1] = f2 * (1 / d2)
+        H[:, 0] = (e2 - b2 * H[:, 1]) * (1 / a2)
 
     use_either = np.logical_not(np.all(H > 0, axis=1))
     H[use_either, :] = solve_either[use_either, :]
